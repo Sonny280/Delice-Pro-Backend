@@ -2,16 +2,16 @@
   "name": "delice-pro-backend",
   "version": "1.0.0",
   "description": "API REST pour le logiciel de gestion Delice Pro",
-  "main": "dist/server.js",
-  "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-   "build": "node ./node_modules/prisma/build/index.js generate && tsc",
-"start": "node ./node_modules/prisma/build/index.js migrate deploy && node dist/server.js",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "prisma:generate": "prisma generate",
-    "schema:electron": "node scripts/build-electron-schema.js",
-    "prisma:generate:electron": "npm run schema:electron && prisma generate --schema=prisma/schema.electron.prisma"
+  "main": "dist/server.js","scripts": {
+  "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+  "build": "node ./node_modules/prisma/build/index.js generate && node ./node_modules/typescript/bin/tsc",
+  "start": "node ./node_modules/prisma/build/index.js migrate deploy && node dist/server.js",
+  "prisma:migrate": "node ./node_modules/prisma/build/index.js migrate dev",
+  "prisma:studio": "node ./node_modules/prisma/build/index.js studio",
+  "prisma:generate": "node ./node_modules/prisma/build/index.js generate",
+  "schema:electron": "node scripts/build-electron-schema.js",
+  "prisma:generate:electron": "npm run schema:electron && node ./node_modules/prisma/build/index.js generate --schema=prisma/schema.electron.prisma"
+
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
