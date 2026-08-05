@@ -1,0 +1,331 @@
+// src/modules/recettes/recettes.service.ts
+import { z } from "zod";
+import prisma from "../../config/database";
+import { AppError } from "../../middleware/error.middleware";
+import { calculerCoutRecette } from "../../utils/calculations";
+
+// ─── Schémas ──────────────────────────────────────────────────────────────
+export const createRecetteSchema = z.object({
+  nom:                      z.string().min(2, "Le nom est requis (minimum 2 caractères)"),
+  description:              z.string().optional(),
+  ratioPate:                z.number().min(0.01, "Le coefficient doit être supérieur à 0").default(1.0),
+  tauxPerte:                z.number().min(0, "Le taux de perte ne peut pas être négatif").max(100).default(0),
+  categorie:                z.string().optional(),
+  estViennoiserie:          z.boolean().optional().default(false),
+  ingredientReference:      z.string().optional(),
+  ingredientReferenceNom:   z.string().optional(),
+  ingredientReferenceUnite: z.string().optional(),
+  ingredients: z.array(z.object({
+    mpId:     z.string().optional().default(""),
+    quantite: z.number().min(0).default(0), // Accepte 0 — filtré après
+    uniteId:  z.string().optional(),
+  })).default([]), // Pas de min(1) — filtrage côté service
+});
+
+export const updateRecetteSchema = createRecetteSchema.partial();
+export type CreateRecetteInput = z.infer<typeof createRecetteSchema>;
+
+// ─── Include standard ─────────────────────────────────────────────────────
+const includeComplet = {
+  ingredients: {
+    include: {
+      mp:    { select: { id: true, nom: true, prixAchat: true, unite: { select: { abreviation: true } } } },
+      unite: { select: { id: true, nom: true, abreviation: true, coefficient: true } },
+    },
+  },
+  produits: {
+    select: { id: true, nom: true, prixVente: true, grammage: true, margeMin: true },
+  },
+};
+
+// ─── Enrichir avec les calculs ────────────────────────────────────────────
+//
+// CORRECTIFS APPLIQUÉS ICI :
+// 1. Arrondi — coutParKgPate, piecesParKgFarine, coutRevient, margeValeur,
+//    margePct utilisaient (x * 100) / 100, qui ne fait RIEN (équivaut à x
+//    tout court) — corrigé en Math.round(x * 100) / 100, le vrai arrondi
+//    à 2 décimales.
+// 2. Coefficient multiplicateur — ajouté (prixVente ÷ coutRevient), pour
+//    correspondre à la colonne "Marge" du fichier Excel de référence, qui
+//    est en réalité un coefficient ("je vends combien de fois mon coût ?"),
+//    pas un pourcentage. Ajouté EN PLUS de margePct, rien n'est retiré.
+async function enrichir(recette: any) {
+  const coutMP = await calculerCoutRecette(recette.id);
+  const ratio  = recette.ratioPate ?? 1;
+
+  // Cout par kg de pate — CORRIGÉ : vrai arrondi à 2 décimales
+  const coutParKgPate = ratio > 0 ? Math.round((coutMP / ratio) * 100) / 100 : 0;
+
+  // Calculs par produit
+  const produitsAvecCalc = (recette.produits ?? []).map((p: any) => {
+    if (!p.grammage || p.grammage <= 0) return { ...p, calc: null };
+
+    const pateUtilisable = ratio * 1000 * (1 - (recette.tauxPerte ?? 0) / 100);
+
+    // CORRIGÉ : vrai arrondi à 2 décimales sur les 4 lignes suivantes
+    const piecesParKgFarine = Math.round((pateUtilisable / p.grammage) * 100) / 100;
+    const coutRevient       = piecesParKgFarine > 0 ? Math.round((coutMP / piecesParKgFarine) * 100) / 100 : 0;
+    const margeValeur       = Math.round((p.prixVente - coutRevient) * 100) / 100;
+    const margePct          = p.prixVente > 0 ? Math.round((margeValeur / p.prixVente) * 10000) / 100 : 0;
+
+    // NOUVEAU : coefficient multiplicateur — "je vends combien de fois
+    // mon coût ?" (Prix vente ÷ Coût de revient). Méthode utilisée dans
+    // le fichier Excel de référence, ajoutée en complément de margePct.
+    const coeffMultiplicateur = coutRevient > 0
+      ? Math.round((p.prixVente / coutRevient) * 100) / 100
+      : null;
+
+    // Prix conseille pour atteindre la marge minimale
+    const margeMin      = p.margeMin ?? 25;
+    const prixConseille = margePct < margeMin && coutRevient > 0
+      ? Math.ceil(coutRevient / (1 - margeMin / 100))
+      : null;
+
+    return {
+      ...p,
+      calc: { piecesParKgFarine, coutRevient, margeValeur, margePct, coeffMultiplicateur, prixConseille },
+    };
+  });
+
+  return {
+    ...recette,
+    coutMP,
+    coutParKgPate,
+    produits: produitsAvecCalc,
+  };
+}
+
+// ─── Lister les recettes ──────────────────────────────────────────────────
+export async function getRecettes(companyId: string) {
+  const recettes = await prisma.recette.findMany({
+    where:   { companyId, actif: true },
+    include: includeComplet,
+    orderBy: { nom: "asc" },
+  });
+  // Enrichir en parallele (evite N+1 sequentiel)
+  return Promise.all(recettes.map(enrichir));
+}
+
+// ─── Créer une recette ────────────────────────────────────────────────────
+export async function createRecette(companyId: string, data: CreateRecetteInput) {
+  // ── Validation métier ─────────────────────────────────────────────────
+  // 1. Nom déjà utilisé
+  const existing = await prisma.recette.findFirst({
+    where: { nom: data.nom.trim(), companyId, actif: true },
+  });
+  if (existing)
+    throw new AppError(
+      `Une recette nommée "${data.nom}" existe déjà. Choisissez un autre nom ou modifiez la recette existante.`,
+      409
+    );
+
+  // 2. Coefficient invalide
+  if (!data.ratioPate || data.ratioPate <= 0)
+    throw new AppError(
+      "Le coefficient (ratio pâte) est obligatoire et doit être supérieur à 0. Exemple : 1.63 pour le Pain Blanc.",
+      400
+    );
+
+  // 3. Filtrer les lignes vides
+  const ingredientsBruts = data.ingredients.filter(
+    ing => ing.mpId && ing.mpId.trim() !== "" && ing.quantite > 0
+  );
+
+  // 4. Aucun ingrédient valide
+  if (!ingredientsBruts.length)
+    throw new AppError(
+      "La recette doit avoir au moins un ingrédient. Sélectionnez une matière première et saisissez sa quantité.",
+      400
+    );
+
+  // 5. Valider chaque MP et quantité
+  for (let i = 0; i < ingredientsBruts.length; i++) {
+    const ing = ingredientsBruts[i];
+
+    if (ing.quantite <= 0)
+      throw new AppError(
+        `Ingrédient ligne ${i + 1} : la quantité doit être supérieure à 0.`,
+        400
+      );
+
+    const mp = await prisma.matierePremiere.findFirst({
+      where: { id: ing.mpId, companyId },
+    });
+    if (!mp)
+      throw new AppError(
+        `Ingrédient ligne ${i + 1} : la matière première sélectionnée n'existe pas ou n'appartient pas à votre établissement.`,
+        400
+      );
+    if (!mp.actif)
+      throw new AppError(
+        `Ingrédient ligne ${i + 1} : la matière première "${mp.nom}" est désactivée. Réactivez-la d'abord dans Stocks.`,
+        400
+      );
+
+    if (ing.uniteId?.trim()) {
+      const unite = await prisma.unite.findFirst({
+        where: { id: ing.uniteId, companyId },
+      });
+      if (!unite)
+        throw new AppError(
+          `Ingrédient ligne ${i + 1} : l'unité sélectionnée n'existe pas. Vérifiez vos unités dans Paramètres.`,
+          400
+        );
+    }
+  }
+
+  // 6. Doublons dans les ingrédients
+  const mpIds = ingredientsBruts.map(ing => ing.mpId);
+  const doublons = mpIds.filter((id, idx) => mpIds.indexOf(id) !== idx);
+  if (doublons.length > 0) {
+    const mpDoublon = await prisma.matierePremiere.findFirst({ where: { id: doublons[0] } });
+    throw new AppError(
+      `La matière première "${mpDoublon?.nom ?? "inconnue"}" apparaît plusieurs fois. Fusionnez les lignes en une seule.`,
+      400
+    );
+  }
+
+  const recette = await prisma.recette.create({
+    data: {
+      nom:         data.nom,
+      description: data.description,
+      ratioPate:   data.ratioPate,
+      tauxPerte:   data.tauxPerte ?? 0,
+      categorie:   data.categorie,
+      companyId,
+      ingredients: {
+        create: ingredientsBruts.map(ing => ({
+          mpId:     ing.mpId,
+          quantite: ing.quantite,
+          ...(ing.uniteId?.trim() ? { uniteId: ing.uniteId } : {}),
+        })),
+      },
+    },
+    include: includeComplet,
+  });
+  return enrichir(recette);
+}
+
+// ─── Mettre à jour une recette ────────────────────────────────────────────
+export async function updateRecette(
+  recetteId: string,
+  companyId: string,
+  data: Partial<CreateRecetteInput>
+) {
+  const recette = await prisma.recette.findFirst({ where: { id: recetteId, companyId } });
+  if (!recette) throw new AppError("Recette introuvable", 404);
+
+  // Verifier unicite du nom si changement
+  if (data.nom && data.nom !== recette.nom) {
+    const existing = await prisma.recette.findFirst({
+      where: { nom: data.nom, companyId, actif: true, NOT: { id: recetteId } },
+    });
+    if (existing) throw new AppError(`Une recette "${data.nom}" existe déjà`, 409);
+  }
+
+  if (data.ingredients) {
+    const ingredientsValides = data.ingredients.filter(
+      ing => ing.mpId && ing.mpId.trim() !== "" && ing.quantite > 0
+    );
+    // Supprimer + recréer les ingrédients dans une transaction
+    await prisma.$transaction([
+      prisma.recetteIngredient.deleteMany({ where: { recetteId } }),
+      prisma.recette.update({
+        where: { id: recetteId },
+        data: {
+          ...(data.nom         !== undefined ? { nom:         data.nom         } : {}),
+          ...(data.ratioPate   !== undefined ? { ratioPate:   data.ratioPate   } : {}),
+          ...(data.tauxPerte   !== undefined ? { tauxPerte:   data.tauxPerte   } : {}),
+          ...(data.categorie   !== undefined ? { categorie:   data.categorie   } : {}),
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          ingredients: {
+            create: ingredientsValides.map(ing => ({
+              mpId:     ing.mpId,
+              quantite: ing.quantite,
+              ...(ing.uniteId?.trim() ? { uniteId: ing.uniteId } : {}),
+            })),
+          },
+        },
+      }),
+    ]);
+  } else {
+    await prisma.recette.update({
+      where: { id: recetteId },
+      data: {
+        ...(data.nom         !== undefined ? { nom:         data.nom         } : {}),
+        ...(data.ratioPate   !== undefined ? { ratioPate:   data.ratioPate   } : {}),
+        ...(data.tauxPerte   !== undefined ? { tauxPerte:   data.tauxPerte   } : {}),
+        ...(data.categorie   !== undefined ? { categorie:   data.categorie   } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+      },
+    });
+  }
+
+  const updated = await prisma.recette.findUnique({
+    where:   { id: recetteId },
+    include: includeComplet,
+  });
+  return enrichir(updated);
+}
+
+// ─── Dupliquer une recette ────────────────────────────────────────────────
+export async function dupliquerRecette(recetteId: string, companyId: string) {
+  const source = await prisma.recette.findFirst({
+    where:   { id: recetteId, companyId },
+    include: { ingredients: true },
+  });
+  if (!source) throw new AppError("Recette source introuvable", 404);
+
+  // Trouver un nom unique
+  let nom = `${source.nom} (copie)`;
+  let tentative = 1;
+  while (await prisma.recette.findFirst({ where: { nom, companyId, actif: true } })) {
+    tentative++;
+    nom = `${source.nom} (copie ${tentative})`;
+  }
+
+  const copie = await prisma.recette.create({
+    data: {
+      nom,
+      description: source.description,
+      ratioPate:   source.ratioPate,
+      tauxPerte:   source.tauxPerte ?? 0,
+      categorie:   source.categorie,
+      companyId,
+      ingredients: {
+        create: source.ingredients.map(ing => ({
+          mpId:     ing.mpId,
+          quantite: ing.quantite,
+          ...(ing.uniteId ? { uniteId: ing.uniteId } : {}),
+        })),
+      },
+    },
+    include: includeComplet,
+  });
+  return enrichir(copie);
+}
+
+// ─── Archiver une recette (soft delete) ───────────────────────────────────
+export async function archiverRecette(recetteId: string, companyId: string) {
+  const recette = await prisma.recette.findFirst({ where: { id: recetteId, companyId } });
+  if (!recette) throw new AppError("Recette introuvable", 404);
+
+  // Verifier qu'elle n'est pas utilisee dans une production recente (30 jours)
+  const productionRecente = await prisma.production.findFirst({
+    where: {
+      recetteId,
+      date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    },
+  });
+  if (productionRecente) {
+    throw new AppError(
+      "Cette recette a été utilisée dans une production récente (30 jours). Archivage impossible.",
+      409
+    );
+  }
+
+  return prisma.recette.update({
+    where: { id: recetteId },
+    data:  { actif: false },
+  });
+}
