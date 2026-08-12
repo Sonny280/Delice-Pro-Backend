@@ -35,6 +35,7 @@ import favorisRoutes      from "./modules/favoris/favoris.routes";
 import clotureRoutes from "./modules/cloture/cloture.routes";
 import abonnementRoutes from "./modules/abonnement/abonnement.routes";
 import chargesRoutes from "./modules/charges/charges.routes";
+import importRoutes from "./modules/import/import.routes";
 
 const app = express();
 
@@ -92,6 +93,7 @@ app.use("/api/cloture",        clotureRoutes);
 app.use("/api/favoris",        favorisRoutes);
 app.use("/api/abonnement",     abonnementRoutes);
 app.use("/api/charges",        chargesRoutes);
+app.use("/api/import",         importRoutes);
 
 // ── AJOUT ELECTRON ───────────────────────────────────────────────
 // Sert le frontend compile (React) quand l'app est packagee.
