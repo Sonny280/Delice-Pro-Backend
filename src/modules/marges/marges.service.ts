@@ -507,6 +507,8 @@ export async function simulerImpactHausse(companyId: string, variations: {
           .map((ing: any) => (nouveauxPrix.get(ing.mp.id) as any)!.nom) ?? [],
       };
     }),
+
+    
     variationsAppliquees: Array.from(nouveauxPrix.entries()).map(([id, data]) => ({
       mpId: id, ...data,
     })),
