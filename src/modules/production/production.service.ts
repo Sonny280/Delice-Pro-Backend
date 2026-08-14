@@ -111,7 +111,9 @@ export async function enregistrerProduction(
   }
 
   // 4. Différence et écart
-  const difference = Math.round((pateTheorique - data.pateEffective) * 100) / 100;
+  // CORRIGÉ : réel − théorique (pas théorique − réel) — un manque de pâte
+  // doit afficher un chiffre négatif, un surplus un chiffre positif.
+  const difference = Math.round((data.pateEffective - pateTheorique) * 100) / 100;
   const ecartPct   = pateTheorique > 0
     ? Math.round((difference / pateTheorique) * 10000) / 100 : 0;
 
@@ -688,5 +690,4 @@ export async function getProductions(companyId: string, options: {
     take: 150,
   });
 }
-
 

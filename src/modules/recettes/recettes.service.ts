@@ -11,6 +11,7 @@ export const createRecetteSchema = z.object({
   ratioPate:                z.number().min(0.01, "Le coefficient doit être supérieur à 0").default(1.0),
   tauxPerte:                z.number().min(0, "Le taux de perte ne peut pas être négatif").max(100).default(0),
   categorie:                z.string().optional(),
+  categorieProd:            z.enum(["BOULANGERIE","VIENNOISERIE_PETRISSAGE","VIENNOISERIE_FACONNAGE","PATISSERIE"]).optional(),
   estViennoiserie:          z.boolean().optional().default(false),
   ingredientReference:      z.string().optional(),
   ingredientReferenceNom:   z.string().optional(),
@@ -192,6 +193,7 @@ export async function createRecette(companyId: string, data: CreateRecetteInput)
       ratioPate:   data.ratioPate,
       tauxPerte:   data.tauxPerte ?? 0,
       categorie:   data.categorie,
+      categorieProd: data.categorieProd,
       companyId,
       ingredients: {
         create: ingredientsBruts.map(ing => ({
@@ -237,6 +239,7 @@ export async function updateRecette(
           ...(data.ratioPate   !== undefined ? { ratioPate:   data.ratioPate   } : {}),
           ...(data.tauxPerte   !== undefined ? { tauxPerte:   data.tauxPerte   } : {}),
           ...(data.categorie   !== undefined ? { categorie:   data.categorie   } : {}),
+          ...(data.categorieProd !== undefined ? { categorieProd: data.categorieProd } : {}),
           ...(data.description !== undefined ? { description: data.description } : {}),
           ingredients: {
             create: ingredientsValides.map(ing => ({
@@ -256,6 +259,7 @@ export async function updateRecette(
         ...(data.ratioPate   !== undefined ? { ratioPate:   data.ratioPate   } : {}),
         ...(data.tauxPerte   !== undefined ? { tauxPerte:   data.tauxPerte   } : {}),
         ...(data.categorie   !== undefined ? { categorie:   data.categorie   } : {}),
+        ...(data.categorieProd !== undefined ? { categorieProd: data.categorieProd } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
       },
     });
@@ -291,6 +295,7 @@ export async function dupliquerRecette(recetteId: string, companyId: string) {
       ratioPate:   source.ratioPate,
       tauxPerte:   source.tauxPerte ?? 0,
       categorie:   source.categorie,
+      categorieProd: (source as any).categorieProd,
       companyId,
       ingredients: {
         create: source.ingredients.map(ing => ({
@@ -329,3 +334,4 @@ export async function archiverRecette(recetteId: string, companyId: string) {
     data:  { actif: false },
   });
 }
+
