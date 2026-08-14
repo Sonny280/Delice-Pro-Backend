@@ -678,6 +678,15 @@ router.post("/ingredients", requireRole(["ADMIN", "RESPONSABLE"]),
       const wb = XLSX.read(req.file.buffer, { type: "buffer" });
       const rows = sheetToRows(wb, wb.SheetNames[0]);
       let crees = 0; const erreurs: string[] = [];
+
+      // IMPORTANT : les quantités de ce fichier doivent déjà être calculées
+      // "pour 1 unité" de l'ingrédient de référence de chaque recette
+      // (colonne "Quantite par kg ref" — le nom l'indique). Contrairement
+      // au formulaire web (qui affiche une confirmation visuelle ✓/⚠),
+      // un import Excel ne permet pas de vérifier en direct qu'une
+      // détection automatique a bien fonctionné — mieux vaut donc que
+      // les quantités arrivent déjà normalisées, sans conversion silencieuse
+      // possible en cas d'erreur.
       for (const row of rows) {
         const recetteNom = str(row["Recette"] ?? row["recette"]);
         const mpNom = str(row["Matiere Premiere"] ?? row["matierePremiere"]);
@@ -696,6 +705,7 @@ router.post("/ingredients", requireRole(["ADMIN", "RESPONSABLE"]),
           crees++;
         } catch (e: any) { erreurs.push(`"${recetteNom}/${mpNom}" : ${e.message}`); }
       }
+
       res.json({ success: true, data: { crees, erreurs } });
     });
   }
@@ -756,3 +766,5 @@ router.get("/template/:module", requireRole(["ADMIN", "RESPONSABLE"]), (_req: Re
 
 
 export default router;
+
+
