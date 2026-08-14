@@ -76,6 +76,19 @@ export async function enregistrerProduction(
   });
   if (!recette) throw new AppError("Recette introuvable", 404);
 
+  // AJOUT : même blocage qu'en amont dans la route — filet de sécurité
+  // au cas où enregistrerProduction() soit appelée autrement un jour
+  // (script, autre route...) sans repasser par la vérification de
+  // production.routes.ts.
+  if (recette.ingredients.length === 0) {
+    throw new AppError(
+      `La recette "${recette.nom}" n'a aucun ingrédient enregistré. ` +
+      `Impossible de lancer une production tant qu'elle n'est pas complétée ` +
+      `(page Recettes → Modifier → ajouter au moins un ingrédient).`,
+      400
+    );
+  }
+
   const quantiteFarine = data.quantiteFarine;
 
   // 2. Pâte théorique
@@ -675,3 +688,5 @@ export async function getProductions(companyId: string, options: {
     take: 150,
   });
 }
+
+
