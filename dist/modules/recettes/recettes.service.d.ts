@@ -5,6 +5,7 @@ export declare const createRecetteSchema: z.ZodObject<{
     ratioPate: z.ZodDefault<z.ZodNumber>;
     tauxPerte: z.ZodDefault<z.ZodNumber>;
     categorie: z.ZodOptional<z.ZodString>;
+    categorieProd: z.ZodOptional<z.ZodEnum<["BOULANGERIE", "VIENNOISERIE_PETRISSAGE", "VIENNOISERIE_FACONNAGE", "PATISSERIE"]>>;
     estViennoiserie: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
     ingredientReference: z.ZodOptional<z.ZodString>;
     ingredientReferenceNom: z.ZodOptional<z.ZodString>;
@@ -33,6 +34,7 @@ export declare const createRecetteSchema: z.ZodObject<{
         uniteId?: string | undefined;
     }[];
     categorie?: string | undefined;
+    categorieProd?: "BOULANGERIE" | "VIENNOISERIE_PETRISSAGE" | "VIENNOISERIE_FACONNAGE" | "PATISSERIE" | undefined;
     description?: string | undefined;
     ingredientReference?: string | undefined;
     ingredientReferenceNom?: string | undefined;
@@ -40,6 +42,7 @@ export declare const createRecetteSchema: z.ZodObject<{
 }, {
     nom: string;
     categorie?: string | undefined;
+    categorieProd?: "BOULANGERIE" | "VIENNOISERIE_PETRISSAGE" | "VIENNOISERIE_FACONNAGE" | "PATISSERIE" | undefined;
     description?: string | undefined;
     ratioPate?: number | undefined;
     tauxPerte?: number | undefined;
@@ -59,6 +62,7 @@ export declare const updateRecetteSchema: z.ZodObject<{
     ratioPate: z.ZodOptional<z.ZodDefault<z.ZodNumber>>;
     tauxPerte: z.ZodOptional<z.ZodDefault<z.ZodNumber>>;
     categorie: z.ZodOptional<z.ZodOptional<z.ZodString>>;
+    categorieProd: z.ZodOptional<z.ZodOptional<z.ZodEnum<["BOULANGERIE", "VIENNOISERIE_PETRISSAGE", "VIENNOISERIE_FACONNAGE", "PATISSERIE"]>>>;
     estViennoiserie: z.ZodOptional<z.ZodDefault<z.ZodOptional<z.ZodBoolean>>>;
     ingredientReference: z.ZodOptional<z.ZodOptional<z.ZodString>>;
     ingredientReferenceNom: z.ZodOptional<z.ZodOptional<z.ZodString>>;
@@ -79,6 +83,7 @@ export declare const updateRecetteSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     nom?: string | undefined;
     categorie?: string | undefined;
+    categorieProd?: "BOULANGERIE" | "VIENNOISERIE_PETRISSAGE" | "VIENNOISERIE_FACONNAGE" | "PATISSERIE" | undefined;
     description?: string | undefined;
     ratioPate?: number | undefined;
     tauxPerte?: number | undefined;
@@ -94,6 +99,7 @@ export declare const updateRecetteSchema: z.ZodObject<{
 }, {
     nom?: string | undefined;
     categorie?: string | undefined;
+    categorieProd?: "BOULANGERIE" | "VIENNOISERIE_PETRISSAGE" | "VIENNOISERIE_FACONNAGE" | "PATISSERIE" | undefined;
     description?: string | undefined;
     ratioPate?: number | undefined;
     tauxPerte?: number | undefined;
@@ -120,6 +126,7 @@ export declare function archiverRecette(recetteId: string, companyId: string): P
     actif: boolean;
     companyId: string;
     categorie: string | null;
+    categorieProd: import(".prisma/client").$Enums.CategorieProd | null;
     description: string | null;
     ratioPate: number;
     tauxPerte: number;

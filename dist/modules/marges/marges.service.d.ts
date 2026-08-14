@@ -37,6 +37,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
         margeValeur: null;
         margePct: null;
         tauxMarque: null;
+        coeffMultiplicateur: null;
         seuilMini: number;
         statut: "INCOMPLET";
         prixConseille: null;
@@ -69,6 +70,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
         margeValeur: number;
         margePct: number;
         tauxMarque: number | null;
+        coeffMultiplicateur: number | null;
         seuilMini: number;
         statut: "OK" | "ACCEPTABLE" | "ALERTE";
         prixConseille: number | null;
@@ -100,6 +102,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: null;
             margePct: null;
             tauxMarque: null;
+            coeffMultiplicateur: null;
             seuilMini: number;
             statut: "INCOMPLET";
             prixConseille: null;
@@ -132,6 +135,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: number;
             margePct: number;
             tauxMarque: number | null;
+            coeffMultiplicateur: number | null;
             seuilMini: number;
             statut: "OK" | "ACCEPTABLE" | "ALERTE";
             prixConseille: number | null;
@@ -157,6 +161,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: null;
             margePct: null;
             tauxMarque: null;
+            coeffMultiplicateur: null;
             seuilMini: number;
             statut: "INCOMPLET";
             prixConseille: null;
@@ -189,6 +194,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: number;
             margePct: number;
             tauxMarque: number | null;
+            coeffMultiplicateur: number | null;
             seuilMini: number;
             statut: "OK" | "ACCEPTABLE" | "ALERTE";
             prixConseille: number | null;
@@ -216,6 +222,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: null;
             margePct: null;
             tauxMarque: null;
+            coeffMultiplicateur: null;
             seuilMini: number;
             statut: "INCOMPLET";
             prixConseille: null;
@@ -248,6 +255,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: number;
             margePct: number;
             tauxMarque: number | null;
+            coeffMultiplicateur: number | null;
             seuilMini: number;
             statut: "OK" | "ACCEPTABLE" | "ALERTE";
             prixConseille: number | null;

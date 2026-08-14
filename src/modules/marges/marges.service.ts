@@ -275,7 +275,7 @@ export async function getMargesTousProduits(companyId: string) {
         refNom: "—", refUnite: "—",
         coutRevient: null, coutMP1unite: null, detailIngredients: [],
         piecesParUniteRef: null,
-        margeValeur: null, margePct: null, tauxMarque: null,
+        margeValeur: null, margePct: null, tauxMarque: null, coeffMultiplicateur: null,
         seuilMini, statut: "INCOMPLET" as const,
         prixConseille: null, aGrammage: false,
         source: "AUCUN" as const, methodeCout: calc.methodeCout,
@@ -293,6 +293,14 @@ export async function getMargesTousProduits(companyId: string) {
     // FIX 3 : Taux de marque = marge ÷ coût (différent de marge ÷ prix vente)
     const tauxMarque = coutRevient > 0
       ? Math.round((margeValeur / coutRevient) * 10000) / 100
+      : null;
+
+    // NOUVEAU : coefficient multiplicateur — "je vends combien de fois mon
+    // coût ?" (Prix vente ÷ Coût de revient). C'est la méthode utilisée
+    // dans les fichiers Excel de référence (ex: "3,00" plutôt qu'un
+    // pourcentage) — ajouté en complément du pourcentage, pas en remplacement.
+    const coeffMultiplicateur = coutRevient > 0
+      ? Math.round((produit.prixVente / coutRevient) * 100) / 100
       : null;
 
     const statut: "OK" | "ACCEPTABLE" | "ALERTE" =
@@ -313,7 +321,7 @@ export async function getMargesTousProduits(companyId: string) {
       coutMP1unite,
       detailIngredients,
       piecesParUniteRef,
-      margeValeur, margePct, tauxMarque,
+      margeValeur, margePct, tauxMarque, coeffMultiplicateur,
       seuilMini, statut,
       prixConseille: statut === "ALERTE" ? prixConseille(coutRevient, seuilMini) : null,
       aGrammage, source, methodeCout,
@@ -504,3 +512,4 @@ export async function simulerImpactHausse(companyId: string, variations: {
     })),
   };
 }
+

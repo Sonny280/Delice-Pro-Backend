@@ -127,6 +127,20 @@ router.post("/enregistrer", (0, auth_middleware_1.requireRole)(["ADMIN", "RESPON
         },
     });
     if (recetteCheck) {
+        // AJOUT : blocage strict — une recette sans aucun ingrédient ne peut
+        // pas donner lieu à une production (jusqu'ici, la boucle de
+        // vérification de stock juste en dessous ne s'exécutait simplement
+        // jamais sur une liste vide, laissant passer la production sans
+        // aucun contrôle ni avertissement).
+        if (recetteCheck.ingredients.length === 0) {
+            res.status(400).json({
+                success: false,
+                message: `La recette "${recetteCheck.nom}" n'a aucun ingrédient enregistré. ` +
+                    `Impossible de lancer une production tant qu'elle n'est pas complétée ` +
+                    `(page Recettes → Modifier → ajouter au moins un ingrédient).`,
+            });
+            return;
+        }
         const farine = data.quantiteFarine;
         for (const ing of recetteCheck.ingredients) {
             if (ing.mp.stockGere === false)

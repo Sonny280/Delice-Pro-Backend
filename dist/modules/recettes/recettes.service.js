@@ -1,5 +1,4 @@
 "use strict";
-// src/modules/recettes/recettes.service.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -10,17 +9,19 @@ exports.createRecette = createRecette;
 exports.updateRecette = updateRecette;
 exports.dupliquerRecette = dupliquerRecette;
 exports.archiverRecette = archiverRecette;
+// src/modules/recettes/recettes.service.ts
 const zod_1 = require("zod");
 const database_1 = __importDefault(require("../../config/database"));
 const error_middleware_1 = require("../../middleware/error.middleware");
 const calculations_1 = require("../../utils/calculations");
-// ─── Schémas ──────────────────────────────────────────────────────────────────
+// ─── Schémas ──────────────────────────────────────────────────────────────
 exports.createRecetteSchema = zod_1.z.object({
     nom: zod_1.z.string().min(2, "Le nom est requis (minimum 2 caractères)"),
     description: zod_1.z.string().optional(),
     ratioPate: zod_1.z.number().min(0.01, "Le coefficient doit être supérieur à 0").default(1.0),
     tauxPerte: zod_1.z.number().min(0, "Le taux de perte ne peut pas être négatif").max(100).default(0),
     categorie: zod_1.z.string().optional(),
+    categorieProd: zod_1.z.enum(["BOULANGERIE", "VIENNOISERIE_PETRISSAGE", "VIENNOISERIE_FACONNAGE", "PATISSERIE"]).optional(),
     estViennoiserie: zod_1.z.boolean().optional().default(false),
     ingredientReference: zod_1.z.string().optional(),
     ingredientReferenceNom: zod_1.z.string().optional(),
@@ -32,7 +33,7 @@ exports.createRecetteSchema = zod_1.z.object({
     })).default([]), // Pas de min(1) — filtrage côté service
 });
 exports.updateRecetteSchema = exports.createRecetteSchema.partial();
-// ─── Include standard ─────────────────────────────────────────────────────────
+// ─── Include standard ─────────────────────────────────────────────────────
 const includeComplet = {
     ingredients: {
         include: {
@@ -44,25 +45,38 @@ const includeComplet = {
         select: { id: true, nom: true, prixVente: true, grammage: true, margeMin: true },
     },
 };
-// ─── Enrichir avec les calculs ────────────────────────────────────────────────
+// ─── Enrichir avec les calculs ────────────────────────────────────────────
+//
+// CORRECTIFS APPLIQUÉS ICI :
+// 1. Arrondi — coutParKgPate, piecesParKgFarine, coutRevient, margeValeur,
+//    margePct utilisaient (x * 100) / 100, qui ne fait RIEN (équivaut à x
+//    tout court) — corrigé en Math.round(x * 100) / 100, le vrai arrondi
+//    à 2 décimales.
+// 2. Coefficient multiplicateur — ajouté (prixVente ÷ coutRevient), pour
+//    correspondre à la colonne "Marge" du fichier Excel de référence, qui
+//    est en réalité un coefficient ("je vends combien de fois mon coût ?"),
+//    pas un pourcentage. Ajouté EN PLUS de margePct, rien n'est retiré.
 async function enrichir(recette) {
     const coutMP = await (0, calculations_1.calculerCoutRecette)(recette.id);
     const ratio = recette.ratioPate ?? 1;
-    // Cout par kg de pate
-    const coutParKgPate = ratio > 0 ? ((coutMP / ratio) * 100) / 100 : 0;
+    // Cout par kg de pate — CORRIGÉ : vrai arrondi à 2 décimales
+    const coutParKgPate = ratio > 0 ? Math.round((coutMP / ratio) * 100) / 100 : 0;
     // Calculs par produit
     const produitsAvecCalc = (recette.produits ?? []).map((p) => {
         if (!p.grammage || p.grammage <= 0)
             return { ...p, calc: null };
         const pateUtilisable = ratio * 1000 * (1 - (recette.tauxPerte ?? 0) / 100);
-        //const piecesParKgFarine = Math.round((pateUtilisable / p.grammage) * 100) / 100;
-        const piecesParKgFarine = ((pateUtilisable / p.grammage) * 100) / 100;
-        // const coutRevient       = piecesParKgFarine > 0 ? Math.round((coutMP / piecesParKgFarine) * 100) / 100 : 0;
-        // const margeValeur       = Math.round((p.prixVente - coutRevient) * 100) / 100;
-        // const margePct          = p.prixVente > 0 ? Math.round((margeValeur / p.prixVente) * 10000) / 100 : 0;
-        const coutRevient = piecesParKgFarine > 0 ? ((coutMP / piecesParKgFarine) * 100) / 100 : 0;
-        const margeValeur = ((p.prixVente - coutRevient) * 100) / 100;
-        const margePct = p.prixVente > 0 ? ((margeValeur / p.prixVente) * 10000) / 100 : 0;
+        // CORRIGÉ : vrai arrondi à 2 décimales sur les 4 lignes suivantes
+        const piecesParKgFarine = Math.round((pateUtilisable / p.grammage) * 100) / 100;
+        const coutRevient = piecesParKgFarine > 0 ? Math.round((coutMP / piecesParKgFarine) * 100) / 100 : 0;
+        const margeValeur = Math.round((p.prixVente - coutRevient) * 100) / 100;
+        const margePct = p.prixVente > 0 ? Math.round((margeValeur / p.prixVente) * 10000) / 100 : 0;
+        // NOUVEAU : coefficient multiplicateur — "je vends combien de fois
+        // mon coût ?" (Prix vente ÷ Coût de revient). Méthode utilisée dans
+        // le fichier Excel de référence, ajoutée en complément de margePct.
+        const coeffMultiplicateur = coutRevient > 0
+            ? Math.round((p.prixVente / coutRevient) * 100) / 100
+            : null;
         // Prix conseille pour atteindre la marge minimale
         const margeMin = p.margeMin ?? 25;
         const prixConseille = margePct < margeMin && coutRevient > 0
@@ -70,7 +84,7 @@ async function enrichir(recette) {
             : null;
         return {
             ...p,
-            calc: { piecesParKgFarine, coutRevient, margeValeur, margePct, prixConseille },
+            calc: { piecesParKgFarine, coutRevient, margeValeur, margePct, coeffMultiplicateur, prixConseille },
         };
     });
     return {
@@ -80,7 +94,7 @@ async function enrichir(recette) {
         produits: produitsAvecCalc,
     };
 }
-// ─── Lister les recettes ──────────────────────────────────────────────────────
+// ─── Lister les recettes ──────────────────────────────────────────────────
 async function getRecettes(companyId) {
     const recettes = await database_1.default.recette.findMany({
         where: { companyId, actif: true },
@@ -90,9 +104,9 @@ async function getRecettes(companyId) {
     // Enrichir en parallele (evite N+1 sequentiel)
     return Promise.all(recettes.map(enrichir));
 }
-// ─── Créer une recette ────────────────────────────────────────────────────────
+// ─── Créer une recette ────────────────────────────────────────────────────
 async function createRecette(companyId, data) {
-    // ── Validation métier ─────────────────────────────────────────────────────
+    // ── Validation métier ─────────────────────────────────────────────────
     // 1. Nom déjà utilisé
     const existing = await database_1.default.recette.findFirst({
         where: { nom: data.nom.trim(), companyId, actif: true },
@@ -141,6 +155,7 @@ async function createRecette(companyId, data) {
             ratioPate: data.ratioPate,
             tauxPerte: data.tauxPerte ?? 0,
             categorie: data.categorie,
+            categorieProd: data.categorieProd,
             companyId,
             ingredients: {
                 create: ingredientsBruts.map(ing => ({
@@ -154,7 +169,7 @@ async function createRecette(companyId, data) {
     });
     return enrichir(recette);
 }
-// ─── Mettre à jour une recette ────────────────────────────────────────────────
+// ─── Mettre à jour une recette ────────────────────────────────────────────
 async function updateRecette(recetteId, companyId, data) {
     const recette = await database_1.default.recette.findFirst({ where: { id: recetteId, companyId } });
     if (!recette)
@@ -179,6 +194,7 @@ async function updateRecette(recetteId, companyId, data) {
                     ...(data.ratioPate !== undefined ? { ratioPate: data.ratioPate } : {}),
                     ...(data.tauxPerte !== undefined ? { tauxPerte: data.tauxPerte } : {}),
                     ...(data.categorie !== undefined ? { categorie: data.categorie } : {}),
+                    ...(data.categorieProd !== undefined ? { categorieProd: data.categorieProd } : {}),
                     ...(data.description !== undefined ? { description: data.description } : {}),
                     ingredients: {
                         create: ingredientsValides.map(ing => ({
@@ -199,6 +215,7 @@ async function updateRecette(recetteId, companyId, data) {
                 ...(data.ratioPate !== undefined ? { ratioPate: data.ratioPate } : {}),
                 ...(data.tauxPerte !== undefined ? { tauxPerte: data.tauxPerte } : {}),
                 ...(data.categorie !== undefined ? { categorie: data.categorie } : {}),
+                ...(data.categorieProd !== undefined ? { categorieProd: data.categorieProd } : {}),
                 ...(data.description !== undefined ? { description: data.description } : {}),
             },
         });
@@ -209,7 +226,7 @@ async function updateRecette(recetteId, companyId, data) {
     });
     return enrichir(updated);
 }
-// ─── Dupliquer une recette ────────────────────────────────────────────────────
+// ─── Dupliquer une recette ────────────────────────────────────────────────
 async function dupliquerRecette(recetteId, companyId) {
     const source = await database_1.default.recette.findFirst({
         where: { id: recetteId, companyId },
@@ -231,6 +248,7 @@ async function dupliquerRecette(recetteId, companyId) {
             ratioPate: source.ratioPate,
             tauxPerte: source.tauxPerte ?? 0,
             categorie: source.categorie,
+            categorieProd: source.categorieProd,
             companyId,
             ingredients: {
                 create: source.ingredients.map(ing => ({
@@ -244,7 +262,7 @@ async function dupliquerRecette(recetteId, companyId) {
     });
     return enrichir(copie);
 }
-// ─── Archiver une recette (soft delete) ──────────────────────────────────────
+// ─── Archiver une recette (soft delete) ───────────────────────────────────
 async function archiverRecette(recetteId, companyId) {
     const recette = await database_1.default.recette.findFirst({ where: { id: recetteId, companyId } });
     if (!recette)

@@ -37,6 +37,7 @@ const favoris_routes_1 = __importDefault(require("./modules/favoris/favoris.rout
 const cloture_routes_1 = __importDefault(require("./modules/cloture/cloture.routes"));
 const abonnement_routes_1 = __importDefault(require("./modules/abonnement/abonnement.routes"));
 const charges_routes_1 = __importDefault(require("./modules/charges/charges.routes"));
+const import_routes_1 = __importDefault(require("./modules/import/import.routes"));
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)({
     origin: env_1.env.FRONTEND_URL,
@@ -85,6 +86,7 @@ app.use("/api/cloture", cloture_routes_1.default);
 app.use("/api/favoris", favoris_routes_1.default);
 app.use("/api/abonnement", abonnement_routes_1.default);
 app.use("/api/charges", charges_routes_1.default);
+app.use("/api/import", import_routes_1.default);
 // ── AJOUT ELECTRON ───────────────────────────────────────────────
 // Sert le frontend compile (React) quand l'app est packagee.
 // En developpement, backend/public/ n'existe pas, donc ce code
