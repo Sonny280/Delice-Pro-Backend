@@ -38,6 +38,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
         margePct: null;
         tauxMarque: null;
         coeffMultiplicateur: null;
+        coutParGramme: null;
         seuilMini: number;
         statut: "INCOMPLET";
         prixConseille: null;
@@ -57,6 +58,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
         refUnite: string;
         coutRevient: number;
         coutMP1unite: number;
+        coutParGramme: number | null;
         detailIngredients: {
             nom: string;
             quantite: number;
@@ -103,6 +105,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margePct: null;
             tauxMarque: null;
             coeffMultiplicateur: null;
+            coutParGramme: null;
             seuilMini: number;
             statut: "INCOMPLET";
             prixConseille: null;
@@ -122,6 +125,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             refUnite: string;
             coutRevient: number;
             coutMP1unite: number;
+            coutParGramme: number | null;
             detailIngredients: {
                 nom: string;
                 quantite: number;
@@ -162,6 +166,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margePct: null;
             tauxMarque: null;
             coeffMultiplicateur: null;
+            coutParGramme: null;
             seuilMini: number;
             statut: "INCOMPLET";
             prixConseille: null;
@@ -181,6 +186,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             refUnite: string;
             coutRevient: number;
             coutMP1unite: number;
+            coutParGramme: number | null;
             detailIngredients: {
                 nom: string;
                 quantite: number;
@@ -223,6 +229,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margePct: null;
             tauxMarque: null;
             coeffMultiplicateur: null;
+            coutParGramme: null;
             seuilMini: number;
             statut: "INCOMPLET";
             prixConseille: null;
@@ -242,6 +249,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             refUnite: string;
             coutRevient: number;
             coutMP1unite: number;
+            coutParGramme: number | null;
             detailIngredients: {
                 nom: string;
                 quantite: number;

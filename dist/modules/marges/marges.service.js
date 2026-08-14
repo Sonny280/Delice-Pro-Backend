@@ -242,7 +242,7 @@ async function getMargesTousProduits(companyId) {
                 refNom: "—", refUnite: "—",
                 coutRevient: null, coutMP1unite: null, detailIngredients: [],
                 piecesParUniteRef: null,
-                margeValeur: null, margePct: null, tauxMarque: null, coeffMultiplicateur: null,
+                margeValeur: null, margePct: null, tauxMarque: null, coeffMultiplicateur: null, coutParGramme: null,
                 seuilMini, statut: "INCOMPLET",
                 prixConseille: null, aGrammage: false,
                 source: "AUCUN", methodeCout: calc.methodeCout,
@@ -257,12 +257,18 @@ async function getMargesTousProduits(companyId) {
         const tauxMarque = coutRevient > 0
             ? Math.round((margeValeur / coutRevient) * 10000) / 100
             : null;
-        // NOUVEAU : coefficient multiplicateur — "je vends combien de fois mon
-        // coût ?" (Prix vente ÷ Coût de revient). C'est la méthode utilisée
-        // dans les fichiers Excel de référence (ex: "3,00" plutôt qu'un
-        // pourcentage) — ajouté en complément du pourcentage, pas en remplacement.
+        // NOUVEAU : coefficient multiplicateur — c'est ce que le fichier Excel
+        // de référence appelle "Marge" (ex "3,00") — toi tu l'appelles "marge
+        // nette". Même valeur, deux noms différents pour la même chose.
         const coeffMultiplicateur = coutRevient > 0
             ? Math.round((produit.prixVente / coutRevient) * 100) / 100
+            : null;
+        // NOUVEAU : coût par gramme — comme la ligne "COUT PAR GRAMME" de
+        // l'Excel. Reste le même peu importe le grammage choisi pour une
+        // même recette (c'est normal — c'est une propriété de la recette,
+        // pas du grammage précis de cette pièce).
+        const coutParGramme = produit.grammage > 0
+            ? Math.round((coutRevient / produit.grammage) * 10000) / 10000
             : null;
         const statut = margePct >= seuilMini * 1.2 ? "OK"
             : margePct >= seuilMini ? "ACCEPTABLE"
@@ -278,6 +284,7 @@ async function getMargesTousProduits(companyId) {
             refNom, refUnite,
             coutRevient,
             coutMP1unite,
+            coutParGramme,
             detailIngredients,
             piecesParUniteRef,
             margeValeur, margePct, tauxMarque, coeffMultiplicateur,

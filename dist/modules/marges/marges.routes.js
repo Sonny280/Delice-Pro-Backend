@@ -6,7 +6,7 @@ const auth_middleware_1 = require("../../middleware/auth.middleware");
 const marges_service_1 = require("./marges.service");
 const router = (0, express_1.Router)();
 router.use(auth_middleware_1.authMiddleware);
-// GET /api/marges
+// GET /api/marges/marges 
 router.get("/", (0, auth_middleware_1.requireRole)(["ADMIN", "RESPONSABLE", "GESTIONNAIRE", "COMPTABLE", "CHEF_PATISSIER"]), async (req, res) => {
     const result = await (0, marges_service_1.getMargesTousProduits)(req.user.companyId);
     res.json({ success: true, data: result });

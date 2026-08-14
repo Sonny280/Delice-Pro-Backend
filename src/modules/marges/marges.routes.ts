@@ -6,7 +6,7 @@ import { getMargesTousProduits, getMargesParCategorie, simulerImpactHausse } fro
 const router = Router();
 router.use(authMiddleware);
 
-// GET /api/marges/marges 
+// GET /api/marges/marges /marge
 router.get("/",
   requireRole(["ADMIN", "RESPONSABLE", "GESTIONNAIRE", "COMPTABLE", "CHEF_PATISSIER"]),
   async (req: Request, res: Response) => {
