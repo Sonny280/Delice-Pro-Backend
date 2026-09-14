@@ -737,12 +737,27 @@ router.post("/recettes", (0, auth_middleware_1.requireRole)(["ADMIN", "RESPONSAB
             const ingredientReferenceNom = str(row["Ingredient Reference Nom"] ?? row["ingredientReferenceNom"]) || "Farine";
             const ingredientReferenceUnite = str(row["Ingredient Reference Unite"] ?? row["ingredientReferenceUnite"]) || "kg";
             const description = str(row["Description"] ?? row["description"]);
+            // AJOUT — cette colonne n'était jamais lue avant : toutes les
+            // recettes importées se retrouvaient sans catégorie de production
+            // assignée (visibles dans tous les onglets de Production par
+            // défaut, au lieu d'être filtrées correctement).
+            const categorieProdBrute = str(row["Categorie Prod"] ?? row["categorieProd"]).toUpperCase();
+            const categorieProd = ["BOULANGERIE", "VIENNOISERIE_PETRISSAGE", "VIENNOISERIE_FACONNAGE", "PATISSERIE"].includes(categorieProdBrute)
+                ? categorieProdBrute
+                : undefined;
             if (!nom)
                 continue;
             try {
                 const existing = await database_1.default.recette.findFirst({ where: { nom, companyId } });
                 if (!existing) {
-                    await database_1.default.recette.create({ data: { nom, ratioPate, tauxPerte, estViennoiserie, ingredientReference, ingredientReferenceNom, ingredientReferenceUnite, description: description || null, companyId } });
+                    await database_1.default.recette.create({
+                        data: {
+                            nom, ratioPate, tauxPerte, estViennoiserie,
+                            ingredientReference, ingredientReferenceNom, ingredientReferenceUnite,
+                            ...(categorieProd ? { categorieProd } : {}),
+                            description: description || null, companyId,
+                        },
+                    });
                     crees++;
                 }
             }
@@ -763,14 +778,6 @@ router.post("/ingredients", (0, auth_middleware_1.requireRole)(["ADMIN", "RESPON
         const rows = sheetToRows(wb, wb.SheetNames[0]);
         let crees = 0;
         const erreurs = [];
-        // IMPORTANT : les quantités de ce fichier doivent déjà être calculées
-        // "pour 1 unité" de l'ingrédient de référence de chaque recette
-        // (colonne "Quantite par kg ref" — le nom l'indique). Contrairement
-        // au formulaire web (qui affiche une confirmation visuelle ✓/⚠),
-        // un import Excel ne permet pas de vérifier en direct qu'une
-        // détection automatique a bien fonctionné — mieux vaut donc que
-        // les quantités arrivent déjà normalisées, sans conversion silencieuse
-        // possible en cas d'erreur.
         for (const row of rows) {
             const recetteNom = str(row["Recette"] ?? row["recette"]);
             const mpNom = str(row["Matiere Premiere"] ?? row["matierePremiere"]);
