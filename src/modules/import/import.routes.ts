@@ -655,11 +655,26 @@ router.post("/recettes", requireRole(["ADMIN", "RESPONSABLE"]),
         const ingredientReferenceNom = str(row["Ingredient Reference Nom"] ?? row["ingredientReferenceNom"]) || "Farine";
         const ingredientReferenceUnite = str(row["Ingredient Reference Unite"] ?? row["ingredientReferenceUnite"]) || "kg";
         const description = str(row["Description"] ?? row["description"]);
+        // AJOUT — cette colonne n'était jamais lue avant : toutes les
+        // recettes importées se retrouvaient sans catégorie de production
+        // assignée (visibles dans tous les onglets de Production par
+        // défaut, au lieu d'être filtrées correctement).
+        const categorieProdBrute = str(row["Categorie Prod"] ?? row["categorieProd"]).toUpperCase();
+        const categorieProd = ["BOULANGERIE", "VIENNOISERIE_PETRISSAGE", "VIENNOISERIE_FACONNAGE", "PATISSERIE"].includes(categorieProdBrute)
+          ? categorieProdBrute
+          : undefined;
         if (!nom) continue;
         try {
           const existing = await prisma.recette.findFirst({ where: { nom, companyId } });
           if (!existing) {
-            await (prisma.recette.create as any)({ data: { nom, ratioPate, tauxPerte, estViennoiserie, ingredientReference, ingredientReferenceNom, ingredientReferenceUnite, description: description || null, companyId } });
+            await (prisma.recette.create as any)({
+              data: {
+                nom, ratioPate, tauxPerte, estViennoiserie,
+                ingredientReference, ingredientReferenceNom, ingredientReferenceUnite,
+                ...(categorieProd ? { categorieProd } : {}),
+                description: description || null, companyId,
+              },
+            });
             crees++;
           }
         } catch (e: any) { erreurs.push(`"${nom}" : ${e.message}`); }
@@ -678,15 +693,6 @@ router.post("/ingredients", requireRole(["ADMIN", "RESPONSABLE"]),
       const wb = XLSX.read(req.file.buffer, { type: "buffer" });
       const rows = sheetToRows(wb, wb.SheetNames[0]);
       let crees = 0; const erreurs: string[] = [];
-
-      // IMPORTANT : les quantités de ce fichier doivent déjà être calculées
-      // "pour 1 unité" de l'ingrédient de référence de chaque recette
-      // (colonne "Quantite par kg ref" — le nom l'indique). Contrairement
-      // au formulaire web (qui affiche une confirmation visuelle ✓/⚠),
-      // un import Excel ne permet pas de vérifier en direct qu'une
-      // détection automatique a bien fonctionné — mieux vaut donc que
-      // les quantités arrivent déjà normalisées, sans conversion silencieuse
-      // possible en cas d'erreur.
       for (const row of rows) {
         const recetteNom = str(row["Recette"] ?? row["recette"]);
         const mpNom = str(row["Matiere Premiere"] ?? row["matierePremiere"]);
@@ -705,7 +711,6 @@ router.post("/ingredients", requireRole(["ADMIN", "RESPONSABLE"]),
           crees++;
         } catch (e: any) { erreurs.push(`"${recetteNom}/${mpNom}" : ${e.message}`); }
       }
-
       res.json({ success: true, data: { crees, erreurs } });
     });
   }
@@ -766,5 +771,4 @@ router.get("/template/:module", requireRole(["ADMIN", "RESPONSABLE"]), (_req: Re
 
 
 export default router;
-
 
