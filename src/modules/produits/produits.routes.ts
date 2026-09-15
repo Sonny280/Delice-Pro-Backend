@@ -41,6 +41,16 @@ const produitSchema = z.object({
   categorieId: z.string().optional(),
   recetteId: z.string().optional(),
   seuilAlerte: z.number().min(0).optional(),
+  // AJOUT — sans ce champ dans le schéma, une image uploadée via
+  // /upload-image ne pouvait jamais être réellement enregistrée sur un
+  // produit : zod retire silencieusement toute clé absente du schéma.
+  imageUrl: z.string().optional().nullable(),
+  // AJOUT — ces champs existent sur le modèle Produit mais n'étaient pas
+  // acceptés ici non plus (dlvJours, estSemiFini, prixAchat — utilisés
+  // par le formulaire StocksPage.tsx).
+  dlvJours: z.number().min(0).optional(),
+  estSemiFini: z.boolean().optional(),
+  prixAchat: z.number().min(0).optional(),
 });
 
 // GET /api/produits — Lister les produits avec leurs marges calculées
@@ -147,3 +157,4 @@ router.post("/upload-image",
 );
 
 export default router;
+
