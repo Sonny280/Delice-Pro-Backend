@@ -37,6 +37,8 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
         margeValeur: null;
         margePct: null;
         tauxMarque: null;
+        coeffMultiplicateur: null;
+        coutParGramme: null;
         seuilMini: number;
         statut: "INCOMPLET";
         prixConseille: null;
@@ -56,6 +58,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
         refUnite: string;
         coutRevient: number;
         coutMP1unite: number;
+        coutParGramme: number | null;
         detailIngredients: {
             nom: string;
             quantite: number;
@@ -69,6 +72,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
         margeValeur: number;
         margePct: number;
         tauxMarque: number | null;
+        coeffMultiplicateur: number | null;
         seuilMini: number;
         statut: "OK" | "ACCEPTABLE" | "ALERTE";
         prixConseille: number | null;
@@ -100,6 +104,8 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: null;
             margePct: null;
             tauxMarque: null;
+            coeffMultiplicateur: null;
+            coutParGramme: null;
             seuilMini: number;
             statut: "INCOMPLET";
             prixConseille: null;
@@ -119,6 +125,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             refUnite: string;
             coutRevient: number;
             coutMP1unite: number;
+            coutParGramme: number | null;
             detailIngredients: {
                 nom: string;
                 quantite: number;
@@ -132,6 +139,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: number;
             margePct: number;
             tauxMarque: number | null;
+            coeffMultiplicateur: number | null;
             seuilMini: number;
             statut: "OK" | "ACCEPTABLE" | "ALERTE";
             prixConseille: number | null;
@@ -157,6 +165,8 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: null;
             margePct: null;
             tauxMarque: null;
+            coeffMultiplicateur: null;
+            coutParGramme: null;
             seuilMini: number;
             statut: "INCOMPLET";
             prixConseille: null;
@@ -176,6 +186,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             refUnite: string;
             coutRevient: number;
             coutMP1unite: number;
+            coutParGramme: number | null;
             detailIngredients: {
                 nom: string;
                 quantite: number;
@@ -189,6 +200,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: number;
             margePct: number;
             tauxMarque: number | null;
+            coeffMultiplicateur: number | null;
             seuilMini: number;
             statut: "OK" | "ACCEPTABLE" | "ALERTE";
             prixConseille: number | null;
@@ -216,6 +228,8 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: null;
             margePct: null;
             tauxMarque: null;
+            coeffMultiplicateur: null;
+            coutParGramme: null;
             seuilMini: number;
             statut: "INCOMPLET";
             prixConseille: null;
@@ -235,6 +249,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             refUnite: string;
             coutRevient: number;
             coutMP1unite: number;
+            coutParGramme: number | null;
             detailIngredients: {
                 nom: string;
                 quantite: number;
@@ -248,6 +263,7 @@ export declare function getMargesTousProduits(companyId: string): Promise<{
             margeValeur: number;
             margePct: number;
             tauxMarque: number | null;
+            coeffMultiplicateur: number | null;
             seuilMini: number;
             statut: "OK" | "ACCEPTABLE" | "ALERTE";
             prixConseille: number | null;

@@ -737,12 +737,27 @@ router.post("/recettes", (0, auth_middleware_1.requireRole)(["ADMIN", "RESPONSAB
             const ingredientReferenceNom = str(row["Ingredient Reference Nom"] ?? row["ingredientReferenceNom"]) || "Farine";
             const ingredientReferenceUnite = str(row["Ingredient Reference Unite"] ?? row["ingredientReferenceUnite"]) || "kg";
             const description = str(row["Description"] ?? row["description"]);
+            // AJOUT — cette colonne n'était jamais lue avant : toutes les
+            // recettes importées se retrouvaient sans catégorie de production
+            // assignée (visibles dans tous les onglets de Production par
+            // défaut, au lieu d'être filtrées correctement).
+            const categorieProdBrute = str(row["Categorie Prod"] ?? row["categorieProd"]).toUpperCase();
+            const categorieProd = ["BOULANGERIE", "VIENNOISERIE_PETRISSAGE", "VIENNOISERIE_FACONNAGE", "PATISSERIE"].includes(categorieProdBrute)
+                ? categorieProdBrute
+                : undefined;
             if (!nom)
                 continue;
             try {
                 const existing = await database_1.default.recette.findFirst({ where: { nom, companyId } });
                 if (!existing) {
-                    await database_1.default.recette.create({ data: { nom, ratioPate, tauxPerte, estViennoiserie, ingredientReference, ingredientReferenceNom, ingredientReferenceUnite, description: description || null, companyId } });
+                    await database_1.default.recette.create({
+                        data: {
+                            nom, ratioPate, tauxPerte, estViennoiserie,
+                            ingredientReference, ingredientReferenceNom, ingredientReferenceUnite,
+                            ...(categorieProd ? { categorieProd } : {}),
+                            description: description || null, companyId,
+                        },
+                    });
                     crees++;
                 }
             }

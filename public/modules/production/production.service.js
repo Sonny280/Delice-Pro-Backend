@@ -75,6 +75,15 @@ async function enregistrerProduction(companyId, userId, data) {
     });
     if (!recette)
         throw new error_middleware_1.AppError("Recette introuvable", 404);
+    // AJOUT : même blocage qu'en amont dans la route — filet de sécurité
+    // au cas où enregistrerProduction() soit appelée autrement un jour
+    // (script, autre route...) sans repasser par la vérification de
+    // production.routes.ts.
+    if (recette.ingredients.length === 0) {
+        throw new error_middleware_1.AppError(`La recette "${recette.nom}" n'a aucun ingrédient enregistré. ` +
+            `Impossible de lancer une production tant qu'elle n'est pas complétée ` +
+            `(page Recettes → Modifier → ajouter au moins un ingrédient).`, 400);
+    }
     const quantiteFarine = data.quantiteFarine;
     // 2. Pâte théorique
     const pateTheorique = Math.round((recette.ratioPate * quantiteFarine + data.pateRecuperee) * 100) / 100;
@@ -93,7 +102,9 @@ async function enregistrerProduction(companyId, userId, data) {
         }
     }
     // 4. Différence et écart
-    const difference = Math.round((pateTheorique - data.pateEffective) * 100) / 100;
+    // CORRIGÉ : réel − théorique (pas théorique − réel) — un manque de pâte
+    // doit afficher un chiffre négatif, un surplus un chiffre positif.
+    const difference = Math.round((data.pateEffective - pateTheorique) * 100) / 100;
     const ecartPct = pateTheorique > 0
         ? Math.round((difference / pateTheorique) * 10000) / 100 : 0;
     // 5. Heures (cross-minuit géré : session nuit 22h→06h)

@@ -309,31 +309,17 @@ export async function enregistrerProduction(
     }
   }
 
-  // 10. Lignes production + stock produits + LOTS STOCK
+  // 10. Lignes production + stock produits
   // ════════════════════════════════════════════════════
-  // NOUVEAU : pour chaque produit fabriqué, créer un LotStock
-  // avec dateCreation = maintenant et dateExpiration = maintenant + dlvJours
-  const maintenant = new Date();
-
-  const lotsCreees: any[] = [];
+  // RETIRÉ — création de LotStock (suivi DLV automatique par lot).
+  // Décision : plus de suivi automatique par lot ni de détection
+  // d'expiration — les invendus en fin de journée sont désormais
+  // saisis manuellement à la clôture, comme avant l'introduction
+  // de ce système. Le champ dlvJours reste en base sur chaque
+  // produit mais n'est plus utilisé nulle part.
   const lignesCreees = await Promise.all(
     data.lignes.map(async l => {
       const poidsTotal = Math.round(l.quantite * l.poidsUnitaire / 1000 * 1000) / 1000;
-
-      // Récupérer le dlvJours du produit si non fourni par le frontend
-      let dlvJours = l.dlvJours;
-      if (dlvJours === undefined || dlvJours === null) {
-        const prod = await prisma.produit.findUnique({
-          where: { id: l.produitId },
-          select: { dlvJours: true },
-        });
-        dlvJours = prod?.dlvJours ?? 1;
-      }
-
-      // Calculer la date d'expiration
-      // DLV en jours → on ajoute dlvJours × 24h à la date de production
-      const dateExpiration = new Date(maintenant);
-      dateExpiration.setHours(dateExpiration.getHours() + dlvJours * 24);
 
       // Mettre à jour le stock global (inchangé)
       if (l.mettreEnStock) {
@@ -341,24 +327,6 @@ export async function enregistrerProduction(
           where: { id: l.produitId },
           data:  { stockActuel: { increment: l.quantite } },
         });
-      }
-
-      // NOUVEAU : Créer le lot de stock avec traçabilité DLV
-      if (l.mettreEnStock && dlvJours >= 0) {
-        const lot = await (prisma as any).lotStock.create({
-          data: {
-            companyId,
-            produitId:       l.produitId,
-            productionId:    production.id,
-            quantiteInitiale: l.quantite,
-            quantiteRestante: l.quantite,
-            dateCreation:    maintenant,
-            dateExpiration,
-            dlvJours,
-            statut:          "ACTIF",
-          },
-        });
-        lotsCreees.push(lot);
       }
 
       // Créer la ligne de production (inchangé)
@@ -432,21 +400,11 @@ export async function enregistrerProduction(
     difference,    ecartPct,
     totalPieces,
     nbPatons:      data.patons.length,
-    nbLots:        lotsCreees.length,
     alertesStock,
     alerteEcart,  // null = OK | ATTENTION | CRITIQUE
-    // Retourner les lots créés pour affichage dans le frontend
-    lots: lotsCreees.map(lot => ({
-      produitId:      lot.produitId,
-      quantite:       lot.quantiteInitiale,
-      dateCreation:   lot.dateCreation,
-      dateExpiration: lot.dateExpiration,
-      dlvJours:       lot.dlvJours,
-    })),
     message: [
       `Pétrin #${data.numeroPetrin} enregistré.`,
       totalPieces > 0    ? `${totalPieces} pièces fabriquées.` : "",
-      lotsCreees.length > 0 ? `${lotsCreees.length} lot(s) DLV créés.` : "",
       data.patons.length > 0 ? `${data.patons.length} pâtons en chambre froide.` : "",
       `Pâte effective : ${data.pateEffective} kg. Différence : ${difference > 0 ? "+" : ""}${difference} kg (${ecartPct}%).`,
       data.pateRetournee > 0 ? `Pâte retournée : ${data.pateRetournee} kg.` : "",
@@ -512,37 +470,17 @@ export async function faconnerPaton(
     }
   }
 
-  // NOUVEAU : Créer un lot DLV pour les pièces de viennoiserie façonnées
-  // Le DLV de la viennoiserie est en général 1 jour (vendu le jour même)
+  // RETIRÉ — création de LotStock (suivi DLV). Le stock global du
+  // produit est déjà mis à jour ci-dessus ; les invendus se saisissent
+  // désormais manuellement à la clôture, pas de lot à suivre ici.
   const produit = await prisma.produit.findUnique({
     where: { id: data.produitId },
-    select: { nom: true, dlvJours: true, companyId: true },
-  });
-
-  const maintenant = new Date();
-  const dlvJours   = produit?.dlvJours ?? 1;
-  const dateExpiration = new Date(maintenant);
-  dateExpiration.setHours(dateExpiration.getHours() + dlvJours * 24);
-
-  await (prisma as any).lotStock.create({
-    data: {
-      companyId,
-      produitId:        data.produitId,
-      quantiteInitiale: data.nbPieces,
-      quantiteRestante: data.nbPieces,
-      dateCreation:     maintenant,
-      dateExpiration,
-      dlvJours,
-      statut:           "ACTIF",
-      notesExpiration:  `Façonné depuis pâton ${paton.poids} kg`,
-    },
+    select: { nom: true },
   });
 
   return {
     rendement,
-    dlvJours,
-    dateExpiration,
-    message: `Pâton façonné : ${data.nbPieces} "${produit?.nom}". Rendement : ${rendement} pcs/kg. DLV : ${dlvJours}j (expire ${dateExpiration.toLocaleDateString("fr-FR")}).`,
+    message: `Pâton façonné : ${data.nbPieces} "${produit?.nom}". Rendement : ${rendement} pcs/kg.`,
   };
 }
 
@@ -606,14 +544,18 @@ export async function getPatonsEnChambreFroide(companyId: string) {
 
 // ─── Dernière pâte retournée ──────────────────────────────────────────────────
 
-export async function getDerniereRetournee(companyId: string) {
+export async function getDerniereRetournee(companyId: string, categorieProd?: string) {
   const il_y_a_36h = new Date(Date.now() - 36 * 60 * 60 * 1000);
 
   // Chercher le dernier pétrin avec de la pâte retournée
+  // AJOUT : filtre par categorieProd — sans ça, une pâte de boulangerie
+  // pouvait être proposée en réutilisation pour un pétrin de viennoiserie
+  // (recettes et farines totalement différentes, aucun sens à mélanger).
   const candidat = await prisma.production.findFirst({
     where: {
       companyId, date: { gte: il_y_a_36h }, statut: "TERMINEE",
       pateRetournee: { gt: 0 },
+      ...(categorieProd ? { categorieProd } : {}),
     } as any,
     orderBy: { numeroPetrin: "desc" },
     select: {
